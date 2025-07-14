@@ -88,6 +88,7 @@ for k=1%:9
     disp(['ACA Only U V ...']);
     fname=['ACA_UVMisfit_sub-',num2str(subn),'_WholeBrain.mat'];
 %     for nk=10:200
+        nk = 200;
         tic
         [Ux,Vx,MisfitUV,Ik,Jk]=ACA_ADM_ErrUVR(fname,nk,te2p,p,ppN,AnorN,conductivity,teid,that,rs,ks,omega,scth0(end),th_hair,N,FEMord);
         % tri no use in the function

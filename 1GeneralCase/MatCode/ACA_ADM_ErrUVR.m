@@ -10,17 +10,17 @@ ncoil=size(pp,1);
 nroi=size(teid,1);
 
 if exist(fname,'file')  % continue the previous accidental termination
-    ux=load(fname, 'Ux');
-    vx=load(fname, 'Vx');
-    Misfit0=load(fname, 'MisfitUV');
-    I=load(fname, 'Ik');
-    J=load(fname, 'Jk');
+    ux = load_2d_mat_by_slice(fname, '/Ux');
+    vx = load_2d_mat_by_slice(fname, '/Vx');
+    Misfit0 = h5read(fname, '/MisfitUV');
+    I = h5read(fname, '/Ik');
+    J = h5read(fname, '/Jk');
     ZtN1=norm(ux(:,1))*norm(vx(1,:));
-    for k=2:size(ux,2)    
+    for k=2:size(ux,2)
         ZtN0=ZtN1;
         norm_uv=norm(ux(:,k))*norm(vx(k,:));
         uvn=0;
-       for l=1:k-1
+        for l=1:k-1
             uvn=uvn+sum(ux(:,l).*ux(:,k))*sum(vx(:,l).*vx(:,k));
         end
         ZtN1=sqrt(ZtN0^2+2*uvn+norm_uv^2);
@@ -28,18 +28,18 @@ if exist(fname,'file')  % continue the previous accidental termination
 else
     I(1)=1; Zt=[];
     dir0=mod(I(1),nroi);
-    
+
     % from ROI to Coil applying the ADM
     ZI1=ROI2coil_1xyz(pp,Anor,dir0,te2p,p,conductivity,teid(I(1)),rs,ks,omega,scth,th_hair,N,FEMord);
     R1=ZI1'; %Z(I(1),:);
     maxJk=find(abs(R1)==max(abs(R1)));
     J(1)=maxJk(1);
     vx(1,:)=R1/R1(J(1));
-    
+
     % find the coil position id and angle id from the obtained column index
     coilposid=floor(mod(J(1),360)/360)+1;
     angid=mod(mod(J(1),360),360);
-    
+
     % from Coil to ROI applying the FEM
     ZJ1=coil2ROI(coilposid,angid,rs,ks,Anor,teid,te2p,p,conductivity,FEMord);
     R2=ZJ1; %Z(:,J(1));
@@ -103,14 +103,14 @@ for k=kpre:nk
     for l=1:k-1
         vu=vu+vx(l,J(k))*ux(:,l);
     end
-    
+
     % find the coil position id and angle id from the obtained column index
     coilposid=floor(J(k)/360)+1;
     angid=mod(J(k),360);
     if angid==0
         angid=360; coilposid=coilposid-1;
     end
-    
+
     % from Coil to ROI applying the FEM
     ZJk=coil2ROI(coilposid,angid,rs,ks,Anor,teid,te2p,p,conductivity,FEMord);
     R2=ZJk-vu;
@@ -134,7 +134,7 @@ for k=kpre:nk
         uvn=uvn+sum(ux(:,l).*ux(:,k))*sum(vx(:,l).*vx(:,k));
     end
     ZtN1=sqrt(ZtN0^2+2*uvn+norm_uv^2); % norm(Zt)
-    
+
     Misfit0(k)=norm_uv/ZtN1;
     disp(['k = ', num2str(k),' MisfitUV: ', num2str(Misfit0(k))]);
     if (isnan(Misfit0(k)))
@@ -153,7 +153,24 @@ for k=kpre:nk
     nMis=find(Misfit0<1e-3);
     if length(nMis)>=5
         break;
-    end    
+    end
 end
 k;
+end
 
+function fullvar = load_2d_mat_by_slice(fname, varname)
+info = h5info(fname, varname);
+dims = info.Dataspace.Size;
+numRows = dims(1);
+numCols = dims(2);
+fullvar = zeros(numRows, numCols, 'like', h5read(fname, varname, [1 1], [1 1]));
+if numRows < numCols
+    for row = 1:numRows
+        Vx(row, :) = h5read(fname, varname, [row 1], [1 numCols]);
+    end
+else
+    for col = 1:numCols
+        Vx(:, col) = h5read(fname, varname, [1 col], [numRows 1]);
+    end
+end
+end
