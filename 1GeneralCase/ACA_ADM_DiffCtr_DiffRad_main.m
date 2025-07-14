@@ -11,11 +11,16 @@ FEMord=1;% order of the numerical approximation suggested 1 or 2
 th_hair=.005;%hair thickness or distance of coil from scalp
 scth=.05;%width of the square desired scalp coil position search space
 load exampletest.mat p te2p conductivity;
+% p = nodes in head mesh
+% te2p = tetrahedral connectivity
+% conductivity = tetrahedral conductivity
 
 load CoilPositions % ROI center list
 iroic=32; % ROI center index in the list
 roictr=p(:,idxCoilP(iroic)); %ROI center
 load(['CaseCoils/CoilPosistion_Pos',num2str(iroic)]);  % Coil positions corresponding to the ROI center
+% pp = coil positions
+% Anor = coil position with normal vector
 
 %generate coil
 [rs ks]=genfig8(.056/2,.087/2,.006,9);%magstim specs
@@ -25,7 +30,7 @@ rs=rs';ks=ks';
 [~,conductivity]=ndgrid(1:9,conductivity(:));
 conductivity([2,3,4,6,7,8],:)=0;
 
-idxx=[1:10];
+idxx=1; % run just the 5mm radius
 roilist=5*[1:40]*1e-3; % m
 nk0=[20 25 30 30 30 40 50 50 60 60];  % maximum rank set to terminate the iteration, for radii<5 cm, 60 is enough to reach 2% error
 for iroi=idxx % loop for diffferent ROI radii

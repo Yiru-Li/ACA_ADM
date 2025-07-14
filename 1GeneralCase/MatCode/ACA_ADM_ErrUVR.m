@@ -10,8 +10,11 @@ ncoil=size(pp,1);
 nroi=size(teid,1);
 
 if exist(fname,'file')  % continue the previous accidental termination
-    load(fname);
-    ux=Ux; vx=Vx; Misfit0=MisfitUV; I=Ik; J=Jk;
+    ux=load(fname, 'Ux');
+    vx=load(fname, 'Vx');
+    Misfit0=load(fname, 'MisfitUV');
+    I=load(fname, 'Ik');
+    J=load(fname, 'Jk');
     ZtN1=norm(ux(:,1))*norm(vx(1,:));
     for k=2:size(ux,2)    
         ZtN0=ZtN1;
@@ -68,7 +71,7 @@ kpre=size(ux,2)+1;
 
 for k=kpre:nk
     ZtN0=ZtN1;
-    % tic;
+    tic;
     uv=zeros(size(vx(k-1,:)));
     for l=1:k-1
         uv=uv+ux(I(k),l)*vx(l,:);
@@ -140,12 +143,12 @@ for k=kpre:nk
         vx(k,:)=[];
         break;
     end
-    % time1=toc;
+    toc;
     clear uv vu
     if mod(k,10)==0
         % save in case accidental termination
         Ux=ux; Vx=vx; MisfitUV=Misfit0; Ik=I; Jk=J;
-        % save(fname, 'Ux','Vx','MisfitUV','Ik','Jk','teid','pp','Anor','ZtN0','-v7.3');
+        save(fname, 'Ux','Vx','MisfitUV','Ik','Jk','teid','pp','Anor','ZtN0','-v7.3');
     end
     nMis=find(Misfit0<1e-3);
     if length(nMis)>=5

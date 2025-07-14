@@ -1,0 +1,159 @@
+function [ux,vx,Misfit0,I,J]=ACA_ADM_ErrUVR(fname,nk,te2p,p,pp,Anor,conductivity,teid,that,rs,ks,omega,scth,th_hair,N,FEMord)
+
+% S0=svds(ROI2coil_Mat,80);
+% S00=sort(S0,'descend');
+% S01=S00/S00(1);
+
+% raux(4,:)=1;
+rs2(4,:)=1;
+ncoil=size(pp,1);
+nroi=size(teid,1);
+
+if exist(fname,'file')  % continue the previous accidental termination
+    ux=load(fname, 'Ux');
+    vx=load(fname, 'Vx');
+    Misfit0=load(fname, 'MisfitUV');
+    I=load(fname, 'Ik');
+    J=load(fname, 'Jk');
+    ZtN1=norm(ux(:,1))*norm(vx(1,:));
+    for k=2:size(ux,2)    
+        ZtN0=ZtN1;
+        norm_uv=norm(ux(:,k))*norm(vx(k,:));
+        uvn=0;
+       for l=1:k-1
+            uvn=uvn+sum(ux(:,l).*ux(:,k))*sum(vx(:,l).*vx(:,k));
+        end
+        ZtN1=sqrt(ZtN0^2+2*uvn+norm_uv^2);
+    end
+else
+    I(1)=1; Zt=[];
+    dir0=mod(I(1),nroi);
+    
+    % from ROI to Coil applying the ADM
+    ZI1=ROI2coil_1xyz(pp,Anor,dir0,te2p,p,conductivity,teid(I(1)),rs,ks,omega,scth,th_hair,N,FEMord);
+    R1=ZI1'; %Z(I(1),:);
+    maxJk=find(abs(R1)==max(abs(R1)));
+    J(1)=maxJk(1);
+    vx(1,:)=R1/R1(J(1));
+    
+    % find the coil position id and angle id from the obtained column index
+    coilposid=floor(mod(J(1),360)/360)+1;
+    angid=mod(mod(J(1),360),360);
+    
+    % from Coil to ROI applying the FEM
+    ZJ1=coil2ROI(coilposid,angid,rs,ks,Anor,teid,te2p,p,conductivity,FEMord);
+    R2=ZJ1; %Z(:,J(1));
+    ux(:,1)=R2;
+    maxIk=find(abs(R2)==max(abs(R2)));
+    I(2)=maxIk(1);
+    if ismember(I(2),I(1))
+        % make sure the new row index doesn't exist in the previous list
+        R02=R2;
+        R02(I(2))=[];
+        I0=find(abs(R02)==max(abs(R02)));
+        if I0(1)<=I(2)
+            I(2)=I0(1);
+        else
+            I(2)=I0(1)+1;
+        end
+    end
+    k=1;
+    ZtN1=norm(ux(:,k))*norm(vx(k,:));
+
+    Misfit(1)=1;
+    idx0=[];
+    norm_uv=norm(ux(:,k))*norm(vx(k,:));
+    Misfit0(k)=norm_uv/ZtN1;
+    disp(['k = ', num2str(k),' MisfitUV: ', num2str(Misfit0(k))]);
+end
+
+kpre=size(ux,2)+1;
+
+for k=kpre:nk
+    ZtN0=ZtN1;
+    % tic;
+    uv=zeros(size(vx(k-1,:)));
+    for l=1:k-1
+        uv=uv+ux(I(k),l)*vx(l,:);
+    end
+    Ikid=floor(I(k)/3)+1;
+    dir0=mod(I(k),3);
+    if dir0==0
+        dir0=3; Ikid=Ikid-1;
+    end
+
+    % from ROI to Coil applying the ADM
+    ZIk=ROI2coil_1xyz(pp,Anor,dir0,te2p,p,conductivity,teid(Ikid),rs,ks,omega,scth,th_hair,N,FEMord);
+    R1=ZIk.'-uv;
+    maxIk=find(abs(R1)==max(abs(R1)));
+    J(k)=maxIk(1);
+    if ismember(J(k),J(1:k-1))
+        % make sure the new column index doesn't exist in the previous list
+        R0=R1;
+        R0(J(k))=[];
+        J0=find(abs(R0)==max(abs(R0)));
+        if J0(1)<=J(k)
+            J(k)=J0(1);
+        else
+            J(k)=J0(1)+1;
+        end
+    end
+    vx(k,:)=R1/R1(J(k));
+    vu=zeros(size(ux(:,k-1)));
+    for l=1:k-1
+        vu=vu+vx(l,J(k))*ux(:,l);
+    end
+    
+    % find the coil position id and angle id from the obtained column index
+    coilposid=floor(J(k)/360)+1;
+    angid=mod(J(k),360);
+    if angid==0
+        angid=360; coilposid=coilposid-1;
+    end
+    
+    % from Coil to ROI applying the FEM
+    ZJk=coil2ROI(coilposid,angid,rs,ks,Anor,teid,te2p,p,conductivity,FEMord);
+    R2=ZJk-vu;
+    ux(:,k)=R2;
+    uvn=0;
+    maxJk=find(abs(R2)==max(abs(R2)));
+    I(k+1)=maxJk(1);
+    if ismember(I(k+1),I(1:k))
+        % make sure the new row index doesn't exist in the previous list
+        R02=R2;
+        R02(I(k+1))=[];
+        I0=find(abs(R02)==max(abs(R02)));
+        if I0(1)<=I(k+1)
+            I(k+1)=I0(1);
+        else
+            I(k+1)=I0(1)+1;
+        end
+    end
+    norm_uv=norm(ux(:,k))*norm(vx(k,:));
+    for l=1:k-1
+        uvn=uvn+sum(ux(:,l).*ux(:,k))*sum(vx(:,l).*vx(:,k));
+    end
+    ZtN1=sqrt(ZtN0^2+2*uvn+norm_uv^2); % norm(Zt)
+    
+    Misfit0(k)=norm_uv/ZtN1;
+    disp(['k = ', num2str(k),' MisfitUV: ', num2str(Misfit0(k))]);
+    if (isnan(Misfit0(k)))
+        Misfit0(k)=[];
+        ux(:,k)=[];
+        vx(k,:)=[];
+        break;
+    end
+    % time1=toc;
+    clear uv vu
+    if mod(k,10)==0
+        % save in case accidental termination
+        Ux=ux; Vx=vx; MisfitUV=Misfit0; Ik=I; Jk=J;
+        save(fname, 'Ux','Vx','MisfitUV','Ik','Jk','teid','pp','Anor','ZtN0','-v7.3');
+    end
+    nMis=find(Misfit0<1e-3);
+    if length(nMis)>=5
+        break;
+    end    
+end
+k;
+
